@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BORA ASSESSORIA | Estratégia de Prova</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./config.js"></script>
+<style>
+:root{--g:#35ef72;--bg:#07110b;--card:#0d1b12;--line:#203126;--txt:#f4fff6;--muted:#9bb0a0}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% 0,#103b20 0,#07110b 38%);color:var(--txt);font:16px system-ui,-apple-system,sans-serif}
+main{max-width:1050px;margin:auto;padding:20px}.brand{font-weight:900;letter-spacing:.08em;color:var(--g)}h1{font-size:28px;margin:6px 0 20px}h2{font-size:20px}.card{background:rgba(13,27,18,.94);border:1px solid var(--line);border-radius:18px;padding:18px;margin:14px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}label{display:block;color:var(--muted);font-size:13px;margin-bottom:5px}input,select,textarea{width:100%;padding:12px;border-radius:10px;border:1px solid #2b4333;background:#08120c;color:var(--txt);font-size:16px}button{border:0;border-radius:11px;padding:12px 16px;background:var(--g);color:#031008;font-weight:800;cursor:pointer;margin:4px}button.secondary{background:#183021;color:var(--txt)}button.danger{background:#4a2020;color:#fff}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.hidden{display:none}.pill{padding:5px 9px;border-radius:999px;background:#163521;color:#bfffd0;font-size:12px}.pace{width:80px}.small{font-size:13px;color:var(--muted)}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left}.public{max-width:700px;margin:30px auto}.ok{color:var(--g)}img.route{width:100%;max-height:360px;object-fit:cover;border-radius:14px;margin-top:8px}
+</style></head>
+<body><main>
+<div id="app"></div>
+</main>
+<script>
+const sb=supabase.createClient(window.BORA_SUPABASE_URL,window.BORA_SUPABASE_KEY);
+const app=document.getElementById('app');
+const qs=new URLSearchParams(location.search);
+const fmt=s=>{s=Math.max(0,Math.round(s));return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`};
+const paceSec=p=>{let [m,s]=p.split(':').map(Number);return m*60+(s||0)};
+const secPace=s=>`${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,'0')}`;
+function esc(x=''){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+async function publicView(){
+ let {data,error}=await sb.rpc('get_public_strategy',{p_token:qs.get('share')});
+ if(error||!data?.length){app.innerHTML='<div class="card public"><h1>Estratégia não encontrada</h1><p>O link pode ter expirado ou não está público.</p></div>';return}
+ const s=data[0], rows=s.pace_rows||[], hyd=s.hydration||[], elev=s.elevation||[];
+ app.innerHTML=`<div class="public"><div class="brand">BORA ASSESSORIA</div><h1>${esc(s.race_name)}</h1>
+ <div class="card"><div class="grid"><div><span class="small">Atleta</span><br><b>${esc(s.athlete_name)}</b></div><div><span class="small">Distância</span><br><b>${s.distance} km</b></div><div><span class="small">Meta</span><br><b>${esc(s.target_time)}</b></div></div>
+ ${s.route_image?`<img class="route" src="${esc(s.route_image)}">`:''}</div>
+ ${s.warmup?.length?`<div class="card"><h2>Aquecimento</h2><p>${esc(s.warmup.join(' • '))}</p></div>`:''}
+ <div class="card"><h2>Estratégia por km</h2><table><tr><th>Km</th><th>Pace</th><th>Acumulado</th></tr>${rows.map(r=>`<tr><td>${r.km}</td><td>${r.pace}</td><td>${r.acc}</td></tr>`).join('')}</table></div>
+ ${hyd.length?`<div class="card"><h2>Hidratação</h2>${hyd.map(x=>`<p><span class="pill">Km ${esc(x.km)}</span> ${esc(x.type)} — ${esc(x.note)}</p>`).join('')}</div>`:''}
+ ${elev.length?`<div class="card"><h2>Altimetria</h2>${elev.map(x=>`<p><span class="pill">Km ${esc(x.km)}</span> ${esc(x.profile)} — ${esc(x.note)}</p>`).join('')}</div>`:''}
+ <div class="card"><h2>Execução</h2>${(s.execution_notes||[]).map(x=>`<p>${esc(x)}</p>`).join('')}</div></div>`;
+}
+async function start(){
+ if(qs.has('share')) return publicView();
+ const {data:{session}}=await sb.auth.getSession(); session?dashboard():login();
+}
+function login(){
+ app.innerHTML=`<div class="card" style="max-width:460px;margin:60px auto"><div class="brand">BORA ASSESSORIA • MARCOS RODRIGUES</div><h1>Entrar no painel</h1>
+ <div class="grid"><div><label>E-mail</label><input id="email" type="email" placeholder="seu@email.com"></div><div><label>Senha</label><input id="pass" type="password"></div></div>
+ <div class="row"><button onclick="signin()">Entrar</button><button class="secondary" onclick="signup()">Criar minha conta</button></div><p id="msg" class="small"></p></div>`;
+}
+async function signin(){const {error}=await sb.auth.signInWithPassword({email:email.value,password:pass.value});document.getElementById('msg').textContent=error?error.message:'Entrando...';if(!error)dashboard()}
+async function signup(){const {data,error}=await sb.auth.signUp({email:email.value,password:pass.value});document.getElementById('msg').textContent=error?error.message:'Conta criada. Confira seu e-mail se a confirmação estiver ativada.'}
+async function dashboard(){
+ const {data:{user}}=await sb.auth.getUser();
+ const [a,r,s]=await Promise.all([sb.from('athletes').select('*').order('created_at',{ascending:false}),sb.from('races').select('*').order('created_at',{ascending:false}),sb.from('strategies').select('*').order('created_at',{ascending:false})]);
+ app.innerHTML=`<div class="brand">BORA ASSESSORIA • MARCOS RODRIGUES</div><div class="row" style="justify-content:space-between"><h1>Painel do treinador</h1><button class="secondary" onclick="sb.auth.signOut().then(login)">Sair</button></div>
+ <div class="card"><h2>Novo atleta</h2><div class="grid"><div><label>Nome</label><input id="an"></div><div><label>Idade</label><input id="aa" type="number"></div><div><label>Objetivo</label><input id="ag"></div></div><button onclick="addAthlete()">Salvar atleta</button></div>
+ <div class="card"><h2>Nova prova</h2><div class="grid"><div><label>Nome</label><input id="rn"></div><div><label>Cidade</label><input id="rc"></div><div><label>Data</label><input id="rd" type="date"></div><div><label>Distância (km)</label><input id="rdis" type="number" min=".1" step=".1" placeholder="ex.: 7.5"></div><div><label>Foto da rota</label><input id="rimg" type="file" accept="image/*"></div></div><button onclick="addRace()">Salvar prova</button><div id="rmsg" class="small"></div></div>
+ <div class="card"><h2>Gerar estratégia</h2><div class="grid"><div><label>Atleta</label><select id="sa">${(a.data||[]).map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></div><div><label>Prova</label><select id="sr">${(r.data||[]).map(x=>`<option value="${x.id}">${esc(x.name)} — ${x.distance} km</option>`).join('')}</select></div><div><label>Tempo-alvo</label><input id="st" placeholder="45:00"></div><div><label>Tipo</label><select id="sty"><option value="progressiva">Progressiva</option><option value="constante">Constante</option><option value="conservadora">Conservadora</option></select></div></div>
+ <div class="grid"><div><label>Aquecimento (separe por ;)</label><input id="warm" placeholder="10 min leve; 3 acelerações de 20s"></div><div><label>Hidratação (km:tipo:orientação; ...)</label><input id="hydr" placeholder="3:água:beba alguns goles; 6:água:hidratação"></div><div><label>Altimetria (km:perfil:orientação; ...)</label><input id="elev" placeholder="2:subida leve:segure; 5:descida:aproveite"></div></div>
+ <button onclick="generate()">Gerar e salvar estratégia</button></div>
+ <div class="card"><h2>Estratégias recentes</h2>${(s.data||[]).map(x=>`<div class="row" style="justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)"><span><b>${esc(x.athlete_name_snapshot)}</b> — ${esc(x.race_name_snapshot)} <span class="pill">${x.race_distance_snapshot} km</span></span><button class="secondary" onclick="navigator.clipboard.writeText(location.origin+location.pathname+'?share=${x.share_token}')">Copiar link</button></div>`).join('')||'<p class="small">Nenhuma ainda.</p>'}</div>`;
+}
+async function addAthlete(){const {data:{user}}=await sb.auth.getUser();const {error}=await sb.from('athletes').insert({coach_id:user.id,name:an.value,age:aa.value?Number(aa.value):null,goal:ag.value});if(error)alert(error.message);else dashboard()}
+async function upload(file,user){if(!file)return null;const ext=(file.name.split('.').pop()||'jpg').toLowerCase();const path=`${user.id}/${crypto.randomUUID()}.${ext}`;const {error}=await sb.storage.from('race-routes').upload(path,file,{upsert:false,contentType:file.type||'image/jpeg'});if(error)throw error;return sb.storage.from('race-routes').getPublicUrl(path).data.publicUrl}
+async function addRace(){try{const {data:{user}}=await sb.auth.getUser();let url=await upload(rimg.files[0],user);const {error}=await sb.from('races').insert({coach_id:user.id,name:rn.value,city:rc.value,race_date:rd.value||null,distance:Number(rdis.value),route_image_url:url});if(error)throw error;dashboard()}catch(e){document.getElementById('rmsg').textContent=e.message}}
+function parseList(v){return v.split(';').map(x=>x.trim()).filter(Boolean)}
+function parseHyd(v){return parseList(v).map(x=>{let [km,type,...note]=x.split(':');return {km:Number(km),type:type||'',note:note.join(':')||''}})}
+function parseElev(v){return parseList(v).map(x=>{let [km,profile,...note]=x.split(':');return {km:Number(km),profile:profile||'',note:note.join(':')||''}})}
+function buildRows(dist,target,type){let total=paceSec(target), n=Math.max(1,Math.ceil(dist)), rows=[], base=total/dist;for(let i=1;i<=n;i++){let km=Math.min(i,dist), ratio=type==='progressiva'?(1.012-0.012*(i-1)/Math.max(1,n-1)):type==='conservadora'?(1.018-0.006*(i-1)/Math.max(1,n-1)):1;let p=base*ratio; if(i===n)p=(total-rows.reduce((z,r)=>z+r.sec,0))/(km-(i-1)); rows.push({km:Number(km.toFixed(1)),pace:secPace(p),acc:fmt(rows.reduce((z,r)=>z+r.sec,0)+p*(km-(i-1))),sec:p*(km-(i-1))});}return rows}
+async function generate(){try{const {data:{user}}=await sb.auth.getUser();let [ar,rr]=await Promise.all([sb.from('athletes').select('*').eq('id',sa.value).single(),sb.from('races').select('*').eq('id',sr.value).single()]);if(ar.error||rr.error)throw(ar.error||rr.error);let rows=buildRows(Number(rr.data.distance),st.value,sty.value);let {data,error}=await sb.from('strategies').insert({coach_id:user.id,athlete_id:ar.data.id,race_id:rr.data.id,target_time:st.value,strategy_type:sty.value,athlete_name_snapshot:ar.data.name,race_name_snapshot:rr.data.name,race_distance_snapshot:rr.data.distance,race_city_snapshot:rr.data.city,race_date_snapshot:rr.data.race_date,target_seconds:paceSec(st.value),pace_rows:rows,execution_notes:['Largada: controle os primeiros metros.','Meio: mantenha o ritmo planejado.','Final: aproveite a margem e acelere se estiver bem.'],warmup:parseList(warm.value),hydration:parseHyd(hydr.value),elevation:parseElev(elev.value),route_image:rr.data.route_image_url||null});if(error)throw error;dashboard()}catch(e){alert(e.message)}}
+start();
+</script></body></html>
